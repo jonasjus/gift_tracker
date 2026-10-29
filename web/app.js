@@ -163,9 +163,11 @@ function showView(signedIn) {
   if (!signedIn) { $("#summary").innerHTML = ""; $("#saveState").textContent = "Sign in to see your list"; renderAuth(); }
 }
 
+let sessionKnown = false;
 function onSession(session) {
   const u = session?.user || null;
-  if ((u?.id || null) === (me?.id || null)) return;
+  if (sessionKnown && (u?.id || null) === (me?.id || null)) return;
+  sessionKnown = true;
   me = u;
   if (channel) { sb.removeChannel(channel); channel = null; }
   D = null; sel = null; selOcc = null; ui.sug = {}; ui.filter = {}; ui.editing = false;
