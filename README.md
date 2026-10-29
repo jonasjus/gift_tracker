@@ -58,9 +58,24 @@ gift_tracker/
    ```
    Then open <http://localhost:5173>.
 
-## Hosting
+## Deploying to Vercel
 
-`web/` is a plain static folder. Any static host works: Netlify (drag the folder onto app.netlify.com/drop), Vercel, Cloudflare Pages or GitHub Pages. After deploying, add the live URL to the Site URL / Redirect URLs from step 6.
+`vercel.json` serves the `web/` folder as a static site. The only build step is `scripts/write-config.mjs`, which writes `web/config.js` from environment variables, so no keys need to be committed.
+
+1. In Vercel, open the project, then Settings → Environment Variables. Add these for Production and Preview:
+   - `SUPABASE_URL`: your project URL, e.g. `https://<project-ref>.supabase.co`
+   - `SUPABASE_ANON_KEY`: the `anon` public key from Supabase (Project Settings → API)
+
+   If you connect Supabase through Vercel's Supabase integration instead, it sets `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the script picks those up too.
+2. Leave the Framework Preset at "Other" and the Root Directory at the repository root. `vercel.json` sets the build command and output folder.
+3. Push to `main`, or click Redeploy. The build fails with a clear message if either variable is missing.
+4. In Supabase, open Authentication → URL Configuration:
+   - Set the Site URL to your Vercel URL, e.g. `https://gift-tracker.vercel.app`.
+   - Add `https://*.vercel.app/**` to Redirect URLs, so preview deployments can sign in too.
+
+The database and the `suggest-gifts` function still deploy through the Supabase CLI (setup steps 3 and 4), not through Vercel.
+
+To run locally, either fill in `web/config.js` by hand, or run `SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/write-config.mjs`. Then start `python3 -m http.server 5173 -d web`.
 
 ## Gift suggestions
 

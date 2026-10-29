@@ -1,0 +1,12 @@
+# Supabase CLI cache
+supabase/.temp/
+supabase/.branches/
+
+# Vercel
+.vercel/
+
+# Local env files
+.env
+.env.*
+
+.DS_Store
