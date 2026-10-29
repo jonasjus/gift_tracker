@@ -258,4 +258,24 @@ main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .preview-img { width: 120px; height: 120px; flex: none; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
 .link-fields { flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .link-fields input { width: 100%; background: var(--surface); }
-#linkForm input { flex: 1 1 220px; }
+
+/* Add-gift pane */
+.add-dialog {
+  border: 1px solid var(--line); border-radius: 14px; padding: 0;
+  width: min(520px, calc(100% - 32px)); max-height: calc(100% - 48px);
+  background: var(--surface); color: var(--ink);
+  box-shadow: 0 24px 64px rgb(0 0 0 / .28);
+}
+.add-dialog::backdrop { background: rgb(15 22 21 / .45); backdrop-filter: blur(2px); }
+.add-dialog[open] { animation: sheet-in .16s ease-out; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.sheet { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px 20px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.sheet-head h2 { font-size: 20px; overflow-wrap: anywhere; }
+.sheet-body { display: flex; flex-direction: column; gap: 12px; }
+.sheet-body > .field input { width: 100%; font-size: 16px; padding: 10px 12px; }
+.sheet-actions { justify-content: flex-end; }
+@media (max-width: 520px) {
+  .add-dialog { margin: auto auto 0; width: 100%; max-width: 100%; border-radius: 14px 14px 0 0; }
+  .sheet { padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+}
