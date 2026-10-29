@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gift Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'><rect x='4' y='13' width='26' height='18' rx='2' fill='%23f1e6d4' stroke='%239a6a2f' stroke-width='1.5'/><rect x='2.5' y='9' width='29' height='6' rx='1.5' fill='%23fff' stroke='%239a6a2f' stroke-width='1.5'/><rect x='15' y='9' width='4' height='22' fill='%23b92f5a'/><path d='M17 9 C12 1, 6 5, 10 9 Z M17 9 C22 1, 28 5, 24 9 Z' fill='%23b92f5a'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script src="config.js"></script>
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="bow" viewBox="0 0 34 34" aria-hidden="true">
+        <rect x="4" y="13" width="26" height="18" rx="2" fill="var(--tag-soft)" stroke="var(--tag)" stroke-width="1.5"/>
+        <rect x="2.5" y="9" width="29" height="6" rx="1.5" fill="var(--surface)" stroke="var(--tag)" stroke-width="1.5"/>
+        <rect x="15" y="9" width="4" height="22" fill="var(--ribbon)"/>
+        <path d="M17 9 C12 1, 6 5, 10 9 Z M17 9 C22 1, 28 5, 24 9 Z" fill="var(--ribbon)"/>
+      </svg>
+      <div>
+        <h1>Gift Tracker</h1>
+        <div class="save-state" id="saveState">Loading…</div>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div class="userbox" id="userBox" hidden>
+      <span id="userName"></span>
+      <button class="ghost" data-act="sign-out" id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <section class="panel auth" id="authView" hidden>
+    <h2 id="authTitle">Sign in</h2>
+    <form data-form="auth" id="authForm">
+      <div class="field" id="authNameField" hidden>
+        <label for="authName">Your name</label>
+        <input id="authName" name="display_name" autocomplete="name" placeholder="What family and friends call you">
+      </div>
+      <div class="field">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" name="email" type="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="authPassword">Password</label>
+        <input id="authPassword" name="password" type="password" minlength="8" autocomplete="current-password" required>
+      </div>
+      <button class="primary" type="submit" id="authSubmit">Sign in</button>
+      <p class="msg" id="authMsg" hidden></p>
+      <p class="msg muted"><span id="authSwitchText">No account yet?</span> <button type="button" class="switch" data-act="auth-switch" id="authSwitch">Create one</button></p>
+    </form>
+  </section>
+
+  <div class="cols" id="appView" hidden>
+    <aside>
+      <section class="panel">
+        <div class="sec-head"><h2>People</h2><button class="primary" data-act="add-person" id="addPersonBtn">Add person</button></div>
+        <ul class="people" id="peopleList"></ul>
+      </section>
+      <section class="panel">
+        <h3>Occasions</h3>
+        <ul class="occ" id="occList"></ul>
+        <form class="row" data-form="occasion" id="occForm">
+          <input id="occName" name="name" placeholder="e.g. Wedding anniversary" aria-label="Occasion name" required>
+          <input id="occDate" name="date" type="date" class="short" aria-label="Date" required>
+          <select id="occScope" name="group_id" aria-label="Who sees this occasion"></select>
+          <button type="submit">Add</button>
+        </form>
+        <p class="note" style="margin:0">Open an occasion to see its gift list for everyone. Birthdays come from each person's details.</p>
+      </section>
+      <section class="panel">
+        <h3>Groups</h3>
+        <ul class="groups" id="groupList"></ul>
+        <form class="row" data-form="create-group" id="groupForm">
+          <input id="groupName" name="name" placeholder="New group, e.g. Family" aria-label="Group name" required>
+          <button type="submit">Create</button>
+        </form>
+        <form class="row" data-form="join-group" id="joinForm">
+          <input id="joinCode" name="code" placeholder="Invite code" aria-label="Invite code" required autocomplete="off" style="text-transform:uppercase">
+          <button type="submit">Join</button>
+        </form>
+      </section>
+      <section class="panel">
+        <h3>Settings</h3>
+        <div class="settings">
+          <label for="setName">Your name</label>
+          <input id="setName" data-setting="display_name" placeholder="Name">
+          <label for="setCurrency">Budget currency</label>
+          <input id="setCurrency" data-setting="currency" maxlength="3" placeholder="NOK">
+          <label for="setCountry">Your country</label>
+          <input id="setCountry" data-setting="country" placeholder="Norway">
+        </div>
+      </section>
+    </aside>
+    <main id="main"></main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

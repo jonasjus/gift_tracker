@@ -1,0 +1,753 @@
+<title>Gift Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: ledger-style app — people rail on the left, the selected person's page on the right; price tags hang off every gift. */
+:root {
+  --paper: #f2f5f4;
+  --surface: #ffffff;
+  --ink: #1b2525;
+  --muted: #5b6a68;
+  --line: #d6dfdc;
+  --ribbon: #b92f5a;
+  --ribbon-soft: #f7dfe7;
+  --ribbon-ink: #ffffff;
+  --tag: #9a6a2f;
+  --tag-soft: #f1e6d4;
+  --ok: #2c7552;
+  --warn: #b5541f;
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #111817;
+    --surface: #19221f;
+    --ink: #e6eeeb;
+    --muted: #98a8a4;
+    --line: #2b3835;
+    --ribbon: #ee6f97;
+    --ribbon-soft: #3b1e29;
+    --ribbon-ink: #1a0d12;
+    --tag: #d6a868;
+    --tag-soft: #33291a;
+    --ok: #6cc69c;
+    --warn: #f0965f;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #111817;
+  --surface: #19221f;
+  --ink: #e6eeeb;
+  --muted: #98a8a4;
+  --line: #2b3835;
+  --ribbon: #ee6f97;
+  --ribbon-soft: #3b1e29;
+  --ribbon-ink: #1a0d12;
+  --tag: #d6a868;
+  --tag-soft: #33291a;
+  --ok: #6cc69c;
+  --warn: #f0965f;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; }
+h1 { font-size: 30px; line-height: 1.1; }
+h2 { font-size: 22px; line-height: 1.2; }
+h3 { font-size: 17px; }
+.label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+input, select, textarea {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+textarea { resize: vertical; width: 100%; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--ribbon); outline-offset: 2px;
+}
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 7px 12px; font-weight: 500; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ribbon); border-color: var(--ribbon); color: var(--ribbon-ink); }
+button.primary:hover { filter: brightness(1.06); }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 4px 8px; }
+button.ghost:hover { color: var(--ink); border-color: var(--line); }
+button.danger { color: var(--warn); }
+button:disabled { opacity: .55; cursor: default; }
+
+/* Header */
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.bow { width: 34px; height: 34px; flex: none; }
+.save-state { font-size: 12.5px; color: var(--muted); }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 14px; }
+.summary b { font-weight: 600; }
+
+/* Columns */
+.cols { display: grid; grid-template-columns: 290px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+aside { display: flex; flex-direction: column; gap: 16px; }
+
+/* People list */
+.people { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.person-btn {
+  width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 9px 10px;
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; border-radius: 8px;
+}
+.person-btn:hover { background: var(--paper); border-color: transparent; }
+.person-btn[aria-current="true"] { background: var(--ribbon-soft); }
+.person-btn .pname { font-weight: 600; overflow-wrap: anywhere; }
+.person-btn .pmeta { font-size: 12.5px; color: var(--muted); grid-column: 1 / -1; }
+.person-btn .meter { grid-column: 1 / -1; }
+.ex { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--tag); border: 1px solid var(--tag); border-radius: 4px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; font-weight: 600; }
+
+/* Budget meter */
+.meter { height: 6px; border-radius: 3px; background: var(--paper); border: 1px solid var(--line); overflow: hidden; display: flex; }
+.meter i { display: block; height: 100%; }
+.meter .spent { background: var(--ribbon); }
+.meter .planned { background: var(--tag); opacity: .45; }
+.meter.over .spent { background: var(--warn); }
+.meter.big { height: 10px; border-radius: 5px; }
+
+/* Occasions */
+.occ { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.occ li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; font-size: 14px; }
+.occ .when { font-size: 12.5px; color: var(--muted); }
+.occ li.past { opacity: .55; }
+.occ .oname { border: 0; background: transparent; padding: 2px 6px; margin-left: -6px; text-align: left; font-weight: 500; border-radius: 6px; overflow-wrap: anywhere; }
+.occ .oname:hover { background: var(--paper); }
+.occ .oname[aria-current="true"] { background: var(--ribbon-soft); }
+
+/* Occasion filter chips and per-person groups */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; padding: 3px 11px; border-radius: 999px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.group { display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+.group:first-child { border-top: 0; padding-top: 0; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.group-head button { font-family: var(--font-display); font-size: 17px; border: 0; background: transparent; padding: 0; text-align: left; }
+.group-head button:hover { color: var(--ribbon); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 28px; font-size: 14px; }
+.stats b { font-weight: 600; }
+.todo { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; gap: 8px 12px; align-items: center; }
+.todo .row { flex-wrap: nowrap; }
+@media (max-width: 520px) { .todo { grid-template-columns: 1fr; } .todo .row { flex-wrap: wrap; } }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row > input { flex: 1 1 110px; }
+.row > input.short { flex: 0 1 110px; }
+.settings { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; font-size: 14px; }
+.settings input { width: 100%; }
+
+/* Main */
+main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.phead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 20px; align-items: start; }
+.phead .facts { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 14px; }
+.budget { display: flex; flex-direction: column; gap: 6px; min-width: 220px; flex: 0 1 300px; }
+.budget .nums { display: flex; justify-content: space-between; font-size: 13px; gap: 10px; }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; background: var(--ribbon); }
+.legend span.pl::before { background: var(--tag); opacity: .45; }
+
+.edit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+/* Lists of items */
+.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.items li { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.items li:first-child { border-top: 0; }
+.items .title { font-weight: 500; overflow-wrap: anywhere; }
+.items .sub { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.items .ctrls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: end; }
+.items select { padding: 4px 8px; font-size: 13px; }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+/* Hang-tag price */
+.tag {
+  position: relative; display: inline-flex; align-items: center; gap: 4px;
+  background: var(--tag-soft); color: var(--tag); border: 1px solid var(--tag);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12.5px;
+  padding: 1px 8px 1px 16px; border-radius: 3px 6px 6px 3px;
+  clip-path: polygon(7px 0, 100% 0, 100% 100%, 7px 100%, 0 50%);
+  white-space: nowrap;
+}
+.tag::before { content: ""; position: absolute; left: 6px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: var(--surface); border: 1px solid var(--tag); }
+
+/* Status chip */
+.status { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; font-weight: 600; min-width: 76px; }
+.status.idea { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
+.status.bought { background: var(--tag-soft); color: var(--tag); border: 1px solid var(--tag); }
+.status.given { background: var(--ribbon); color: var(--ribbon-ink); border: 1px solid var(--ribbon); }
+
+/* Suggestions */
+.suggest { border: 1px solid var(--ribbon); background: linear-gradient(var(--ribbon-soft), var(--surface) 120px); }
+.sug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.sug { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sug .why { font-size: 13.5px; color: var(--muted); flex: 1; }
+.sug .stores { font-size: 12.5px; }
+.sug .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.note { font-size: 12.5px; color: var(--muted); }
+.err { color: var(--warn); font-size: 13.5px; }
+.thinking { font-size: 14px; color: var(--muted); }
+.thinking::after { content: "…"; animation: dots 1.2s steps(3) infinite; }
+@keyframes dots { 0% { content: "."; } 33% { content: ".."; } 66% { content: "..."; } }
+
+/* Empty state */
+.welcome { text-align: left; padding: 28px; gap: 14px; }
+.welcome p { margin: 0; max-width: 60ch; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="bow" viewBox="0 0 34 34" aria-hidden="true">
+        <rect x="4" y="13" width="26" height="18" rx="2" fill="var(--tag-soft)" stroke="var(--tag)" stroke-width="1.5"/>
+        <rect x="2.5" y="9" width="29" height="6" rx="1.5" fill="var(--surface)" stroke="var(--tag)" stroke-width="1.5"/>
+        <rect x="15" y="9" width="4" height="22" fill="var(--ribbon)"/>
+        <path d="M17 9 C12 1, 6 5, 10 9 Z M17 9 C22 1, 28 5, 24 9 Z" fill="var(--ribbon)"/>
+      </svg>
+      <div>
+        <h1>Gift Tracker</h1>
+        <div class="save-state" id="saveState">Loading your list…</div>
+      </div>
+    </div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <div class="cols">
+    <aside>
+      <section class="panel">
+        <div class="sec-head"><h2>People</h2><button class="primary" data-act="add-person" id="addPersonBtn">Add person</button></div>
+        <ul class="people" id="peopleList"></ul>
+      </section>
+      <section class="panel">
+        <h3>Occasions</h3>
+        <ul class="occ" id="occList"></ul>
+        <form class="row" data-form="occasion" id="occForm">
+          <input id="occName" name="name" placeholder="e.g. Wedding anniversary" aria-label="Occasion name" required>
+          <input id="occDate" name="date" type="date" class="short" aria-label="Date" required>
+          <button type="submit">Add</button>
+        </form>
+        <p class="note" style="margin:0">Open an occasion to see its gift list for everyone. Birthdays come from each person's details.</p>
+      </section>
+      <section class="panel">
+        <h3>Settings</h3>
+        <div class="settings">
+          <label for="setCurrency">Budget currency</label>
+          <input id="setCurrency" data-setting="currency" maxlength="3" placeholder="NOK">
+          <label for="setCountry">Your country</label>
+          <input id="setCountry" data-setting="country" placeholder="Norway">
+        </div>
+      </section>
+    </aside>
+    <main id="main"></main>
+  </div>
+</div>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  let S = null;          // the whole tracker state
+  let sel = null;        // selected person id
+  let selOcc = null;     // selected occasion id (occasion list view)
+  let store = { kind: "none" };
+  let sampleFn = null;
+  let saveTimer = null;
+  const ui = { editing: false, sug: {}, prompt: {}, busy: null, sugErr: {}, filter: {} };
+  const STATUS = { idea: "Idea", bought: "Bought", given: "Given ✓" };
+
+  function todayISO() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+  function blank() {
+    const t = todayISO();
+    let y = t.getFullYear();
+    if (t > new Date(y, 11, 24)) y++;
+    return { settings: { currency: "NOK", country: "Norway" }, occasions: [{ id: uid(), name: "Christmas", date: `${y}-12-24` }], people: [] };
+  }
+
+  // ---------- dates & money ----------
+  function parseDate(iso) { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); }
+  function nextBirthday(iso) {
+    if (!iso) return null;
+    const [, m, d] = iso.split("-").map(Number);
+    const t = todayISO();
+    let n = new Date(t.getFullYear(), m - 1, d);
+    if (n < t) n = new Date(t.getFullYear() + 1, m - 1, d);
+    return n;
+  }
+  function daysUntil(date) { return Math.round((date - todayISO()) / 86400000); }
+  function fmtDate(date) { return date.toLocaleDateString(undefined, { day: "numeric", month: "short" }); }
+  function inDays(n) { return n === 0 ? "today" : n === 1 ? "tomorrow" : n < 0 ? `${-n} days ago` : `in ${n} days`; }
+  function money(n) {
+    const v = Number(n) || 0;
+    try { return new Intl.NumberFormat(undefined, { style: "currency", currency: S.settings.currency || "NOK", maximumFractionDigits: 0 }).format(v); }
+    catch { return `${Math.round(v).toLocaleString()} ${S.settings.currency}`; }
+  }
+  function totals(p) {
+    let spent = 0, planned = 0;
+    for (const g of p.gifts) { const v = Number(g.price) || 0; if (g.status === "idea") planned += v; else spent += v; }
+    return { spent, planned, budget: Number(p.budget) || 0 };
+  }
+  function meter(p, big) {
+    const { spent, planned, budget } = totals(p);
+    const cap = Math.max(budget, spent + planned, 1);
+    const over = budget > 0 && spent > budget;
+    return `<div class="meter${big ? " big" : ""}${over ? " over" : ""}" role="img" aria-label="Spent ${esc(money(spent))} of ${esc(money(budget))}">
+      <i class="spent" style="width:${(spent / cap) * 100}%"></i><i class="planned" style="width:${(planned / cap) * 100}%"></i></div>`;
+  }
+  function upcoming() {
+    const ev = [];
+    for (const o of S.occasions) { const d = parseDate(o.date); if (daysUntil(d) >= 0) ev.push({ name: o.name, date: d }); }
+    for (const p of S.people) { const d = nextBirthday(p.birthday); if (d) ev.push({ name: `${p.name}'s birthday`, date: d }); }
+    return ev.sort((a, b) => a.date - b.date);
+  }
+  function occasionLabel(id) {
+    if (id === "birthday") return "Birthday";
+    const o = S.occasions.find((o) => o.id === id);
+    return o ? o.name : "";
+  }
+  function occOpts(cur) {
+    return `<option value="">No occasion</option><option value="birthday"${cur === "birthday" ? " selected" : ""}>Birthday</option>` +
+      S.occasions.map((o) => `<option value="${o.id}"${cur === o.id ? " selected" : ""}>${esc(o.name)}</option>`).join("");
+  }
+  function giftRow(p, g) {
+    return `<li><div><div class="title">${esc(g.title)}</div>${g.store ? `<div class="sub">${esc(g.store)}</div>` : ""}</div>
+      <div class="ctrls">
+        <select id="occ-${g.id}" data-gift-occ="${g.id}" data-pid="${p.id}" aria-label="Occasion for ${esc(g.title)}">${occOpts(g.occasion)}</select>
+        ${g.price ? `<span class="tag">${esc(money(g.price))}</span>` : ""}
+        <button class="status ${g.status}" data-act="cycle" data-id="${g.id}" data-pid="${p.id}">${STATUS[g.status]}</button>
+        <button class="ghost" data-act="del-gift" data-id="${g.id}" data-pid="${p.id}" aria-label="Remove ${esc(g.title)}">✕</button>
+      </div></li>`;
+  }
+  const sumPrice = (gs) => gs.reduce((a, g) => a + (Number(g.price) || 0), 0);
+
+  // ---------- persistence ----------
+  function setSaveState(t) { $("#saveState").textContent = t; }
+  function save() {
+    setSaveState("Saving…");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        if (store.kind === "db") { await store.ref.set(S); setSaveState("Saved to your account"); }
+        else { localStorage.setItem("gift-tracker", JSON.stringify(S)); setSaveState("Saved in this browser only"); }
+      } catch (e) {
+        setSaveState("Couldn't save: " + (e && e.message ? e.message : "try again in a moment"));
+      }
+    }, 500);
+  }
+  function commit() { save(); render(); }
+
+  async function boot() {
+    render();
+    let loaded = null;
+    try {
+      const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+      const id = user ? await user.id() : null;
+      if (db && id) {
+        store = { kind: "db", ref: db.collection("data/users/" + id).doc("tracker") };
+        const snap = await store.ref.get();
+        if (snap.exists) loaded = snap.data();
+        setSaveState("Saved to your account");
+      }
+    } catch (e) { store = { kind: "none" }; }
+    if (store.kind !== "db") {
+      store = { kind: "local" };
+      try { const raw = localStorage.getItem("gift-tracker"); if (raw) loaded = JSON.parse(raw); } catch {}
+      setSaveState("Saved in this browser only");
+    }
+    S = loaded && Array.isArray(loaded.people) ? loaded : blank();
+    S.settings ||= { currency: "NOK", country: "Norway" };
+    S.occasions ||= [];
+    sel = S.people[0]?.id || null;
+    render();
+    try { sampleFn = await claude.use("sample"); } catch { sampleFn = null; }
+    render();
+  }
+
+  // ---------- rendering ----------
+  function render() {
+    if (!S) {
+      $("#main").innerHTML = `<section class="panel welcome"><p class="muted">Opening your gift list…</p></section>`;
+      $("#peopleList").innerHTML = "";
+      return;
+    }
+    renderSummary(); renderPeople(); renderOccasions(); renderSettings(); renderMain();
+  }
+
+  function renderSummary() {
+    const next = upcoming()[0];
+    let spent = 0, budget = 0;
+    for (const p of S.people) { const t = totals(p); spent += t.spent; budget += t.budget; }
+    $("#summary").innerHTML =
+      (next ? `<div><span class="label">Next up</span><br><b>${esc(next.name)}</b> · ${fmtDate(next.date)} · ${inDays(daysUntil(next.date))}</div>` : "") +
+      (S.people.length ? `<div><span class="label">Spent so far</span><br><b class="num">${esc(money(spent))}</b> <span class="muted">of ${esc(money(budget))} across ${S.people.length} ${S.people.length === 1 ? "person" : "people"}</span></div>` : "");
+  }
+
+  function renderPeople() {
+    const list = $("#peopleList");
+    if (!S.people.length) { list.innerHTML = `<li class="empty">Nobody here yet.</li>`; return; }
+    const sorted = [...S.people].sort((a, b) => (nextBirthday(a.birthday) || 9e15) - (nextBirthday(b.birthday) || 9e15));
+    list.innerHTML = sorted.map((p) => {
+      const nb = nextBirthday(p.birthday);
+      const meta = [p.relation, nb ? `birthday ${fmtDate(nb)}` : ""].filter(Boolean).join(" · ");
+      return `<li><button class="person-btn" data-act="select" data-id="${p.id}" aria-current="${p.id === sel && !selOcc}">
+        <span class="pname">${esc(p.name)}${p.example ? '<span class="ex">Example</span>' : ""}</span>
+        <span class="num muted" style="font-size:12.5px">${p.gifts.length} gift${p.gifts.length === 1 ? "" : "s"}</span>
+        ${meta ? `<span class="pmeta">${esc(meta)}</span>` : ""}
+        ${p.budget ? meter(p) : ""}
+      </button></li>`;
+    }).join("");
+  }
+
+  function renderOccasions() {
+    const occ = [...S.occasions].sort((a, b) => a.date.localeCompare(b.date));
+    $("#occList").innerHTML = occ.length ? occ.map((o) => {
+      const d = parseDate(o.date), n = daysUntil(d);
+      return `<li class="${n < 0 ? "past" : ""}"><button class="oname" data-act="open-occ" data-id="${o.id}" aria-current="${o.id === selOcc}">${esc(o.name)}</button><span class="when">${fmtDate(d)} · ${inDays(n)}</span>
+        <button class="ghost" data-act="del-occ" data-id="${o.id}" aria-label="Remove ${esc(o.name)}">✕</button></li>`;
+    }).join("") : `<li class="empty">No occasions yet.</li>`;
+  }
+
+  function renderSettings() {
+    for (const el of document.querySelectorAll("[data-setting]")) {
+      if (document.activeElement !== el) el.value = S.settings[el.dataset.setting] || "";
+    }
+  }
+
+  function renderOccasionView(o) {
+    const d = parseDate(o.date), n = daysUntil(d);
+    const rows = S.people.map((p) => ({ p, gifts: p.gifts.filter((g) => g.occasion === o.id) }));
+    const all = rows.flatMap((r) => r.gifts);
+    const by = (s) => all.filter((g) => g.status === s);
+    const done = rows.filter((r) => r.gifts.some((g) => g.status !== "idea")).length;
+    const withGifts = rows.filter((r) => r.gifts.length), without = rows.filter((r) => !r.gifts.length);
+    const addForm = (p, compact) => `
+      <form class="row" data-form="gift" id="og-${o.id}-${p.id}">
+        <input type="hidden" name="pid" value="${p.id}"><input type="hidden" name="occasion" value="${o.id}">
+        <input id="og-${o.id}-${p.id}-title" name="title" placeholder="${compact ? "Gift idea" : `Another gift for ${esc(p.name)}`}" aria-label="Gift for ${esc(p.name)}" required>
+        ${compact ? "" : `<input id="og-${o.id}-${p.id}-store" name="store" placeholder="Where to buy" aria-label="Store">`}
+        <input id="og-${o.id}-${p.id}-price" name="price" type="number" min="0" class="short" placeholder="Price" aria-label="Price">
+        <button type="submit">Add</button>
+      </form>`;
+    return `
+      <section class="panel">
+        <div class="phead">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span class="label">Occasion list</span>
+            <h2>${esc(o.name)}</h2>
+            <div class="facts"><span>${parseDate(o.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span><span>${inDays(n)}</span></div>
+          </div>
+          <div class="stats">
+            <div><span class="label">Ideas</span><br><b class="num">${by("idea").length}</b> <span class="muted num">${esc(money(sumPrice(by("idea"))))}</span></div>
+            <div><span class="label">Bought</span><br><b class="num">${by("bought").length}</b> <span class="muted num">${esc(money(sumPrice(by("bought"))))}</span></div>
+            <div><span class="label">Given</span><br><b class="num">${by("given").length}</b> <span class="muted num">${esc(money(sumPrice(by("given"))))}</span></div>
+            <div><span class="label">People covered</span><br><b class="num">${done} of ${S.people.length}</b></div>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="sec-head"><h3>Gifts for ${esc(o.name)}</h3><span class="note">Grouped by person</span></div>
+        ${withGifts.length ? `<div>${withGifts.map(({ p, gifts }) => `
+          <div class="group">
+            <div class="group-head"><button data-act="select" data-id="${p.id}">${esc(p.name)}</button>
+              <span class="num muted" style="font-size:13px">${esc(money(sumPrice(gifts)))}</span></div>
+            <ul class="items">${gifts.map((g) => giftRow(p, g)).join("")}</ul>
+            ${addForm(p, false)}
+          </div>`).join("")}</div>`
+          : `<p class="empty" style="margin:0">No gifts on this list yet. Add one for someone below, or pick ${esc(o.name)} as the occasion on any gift.</p>`}
+      </section>
+      ${without.length ? `
+      <section class="panel">
+        <div class="sec-head"><h3>Nothing planned yet</h3><span class="note">${without.length} ${without.length === 1 ? "person" : "people"} without a gift for ${esc(o.name)}</span></div>
+        <div class="todo">${without.map(({ p }) => `
+          <button class="ghost" data-act="select" data-id="${p.id}" style="text-align:left;padding-left:0;color:var(--ink);font-weight:600">${esc(p.name)}</button>
+          ${addForm(p, true)}`).join("")}</div>
+      </section>` : ""}`;
+  }
+
+  function renderMain() {
+    const main = $("#main");
+    if (selOcc) {
+      const o = S.occasions.find((x) => x.id === selOcc);
+      if (o) { main.innerHTML = renderOccasionView(o); return; }
+      selOcc = null;
+    }
+    const p = S.people.find((x) => x.id === sel);
+    if (!p) {
+      main.innerHTML = `<section class="panel welcome">
+        <h2>Who are you buying for?</h2>
+        <p>Add the people on your list with their birthday, where they live and a budget. Keep their wishlist and your gift ideas in one place, mark gifts as bought or given, and ask Claude for suggestions they can find in shops in their own country.</p>
+        <div class="row"><button class="primary" data-act="add-person">Add your first person</button>
+        <button data-act="examples">Try it with two example people</button></div>
+      </section>`;
+      return;
+    }
+    const nb = nextBirthday(p.birthday);
+    const t = totals(p);
+    const left = t.budget - t.spent - t.planned;
+    const f = ui.filter[p.id] || "all";
+    const focusOcc = f !== "all" && f !== "none" ? f : "";
+    const shown = f === "all" ? p.gifts : p.gifts.filter((g) => (g.occasion || "none") === f);
+    const chipIds = ["birthday", ...S.occasions.filter((o) => daysUntil(parseDate(o.date)) >= 0 || p.gifts.some((g) => g.occasion === o.id)).map((o) => o.id)];
+    if (p.gifts.some((g) => !g.occasion)) chipIds.push("none");
+    const chip = (v, label) => `<button class="chip" data-act="filter" data-v="${v}" aria-pressed="${f === v}">${esc(label)}</button>`;
+    const chips = `<div class="chips" role="group" aria-label="Show gifts for">${chip("all", "All")}${chipIds.map((v) => chip(v, v === "none" ? "No occasion" : occasionLabel(v))).join("")}</div>`;
+
+    const head = ui.editing ? `
+      <form class="panel" data-form="person" id="personForm">
+        <h2>Edit details</h2>
+        <div class="edit-grid">
+          <div class="field"><label for="pfName">Name</label><input id="pfName" name="name" value="${esc(p.name)}" required></div>
+          <div class="field"><label for="pfRel">Relation</label><input id="pfRel" name="relation" value="${esc(p.relation)}" placeholder="Sister, colleague…"></div>
+          <div class="field"><label for="pfCountry">Lives in</label><input id="pfCountry" name="country" value="${esc(p.country)}" placeholder="${esc(S.settings.country)}"></div>
+          <div class="field"><label for="pfBday">Birthday</label><input id="pfBday" name="birthday" type="date" value="${esc(p.birthday)}"></div>
+          <div class="field"><label for="pfBudget">Budget (${esc(S.settings.currency)})</label><input id="pfBudget" name="budget" type="number" min="0" step="50" value="${esc(p.budget || "")}"></div>
+        </div>
+        <div class="row" style="justify-content:space-between">
+          <div class="row"><button class="primary" type="submit">Save</button><button type="button" data-act="cancel-edit">Cancel</button></div>
+          <button type="button" class="danger" data-act="del-person">Remove ${esc(p.name)}</button>
+        </div>
+      </form>` : `
+      <section class="panel">
+        <div class="phead">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <h2>${esc(p.name)}${p.example ? '<span class="ex">Example</span>' : ""}</h2>
+            <div class="facts">
+              ${p.relation ? `<span>${esc(p.relation)}</span>` : ""}
+              <span>Lives in ${esc(p.country || S.settings.country)}</span>
+              ${nb ? `<span>Birthday ${fmtDate(nb)}, ${inDays(daysUntil(nb))}</span>` : ""}
+            </div>
+            <div><button class="ghost" data-act="edit" style="padding-left:0">Edit details</button></div>
+          </div>
+          <div class="budget">
+            <div class="nums"><span><span class="label">Budget</span></span><span class="num">${t.budget ? esc(money(t.budget)) : "Not set"}</span></div>
+            ${meter(p, true)}
+            <div class="nums"><div class="legend"><span>Bought ${esc(money(t.spent))}</span><span class="pl">Planned ${esc(money(t.planned))}</span></div>
+            ${t.budget ? `<span class="num" style="color:${left < 0 ? "var(--warn)" : "var(--muted)"}">${left < 0 ? esc(money(-left)) + " over" : esc(money(left)) + " left"}</span>` : ""}</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pLikes">What they like, sizes, things they already have</label>
+          <textarea id="pLikes" data-field="likes" rows="3" placeholder="Loves trail running and good coffee. Size M. Already has an AeroPress.">${esc(p.likes)}</textarea>
+        </div>
+      </section>`;
+
+    const wish = `
+      <section class="panel">
+        <div class="sec-head"><h3>Their wishlist</h3><span class="note">What ${esc(p.name)} has asked for</span></div>
+        <ul class="items">${p.wishlist.length ? p.wishlist.map((w) => `
+          <li><div><div class="title">${esc(w.text)}</div></div>
+          <div class="ctrls">${w.price ? `<span class="tag">${esc(money(w.price))}</span>` : ""}
+            <button data-act="plan-wish" data-id="${w.id}">Add to gifts</button>
+            <button class="ghost" data-act="del-wish" data-id="${w.id}" aria-label="Remove ${esc(w.text)}">✕</button></div></li>`).join("")
+          : `<li class="empty">No wishes noted yet. Add what they've mentioned wanting.</li>`}</ul>
+        <form class="row" data-form="wish" id="wishForm">
+          <input id="wishText" name="text" placeholder="Wireless earbuds, a cookbook…" aria-label="Wish" required>
+          <input id="wishPrice" name="price" type="number" min="0" class="short" placeholder="Price" aria-label="Approximate price">
+          <button type="submit">Add wish</button>
+        </form>
+      </section>`;
+
+    const gifts = `
+      <section class="panel">
+        <div class="sec-head"><h3>Gifts${f !== "all" ? ` · ${esc(f === "none" ? "No occasion" : occasionLabel(f))}` : ""}</h3><span class="note">${shown.length ? `${shown.length} · ${esc(money(sumPrice(shown)))}` : ""}</span></div>
+        ${chips}
+        <ul class="items">${shown.length ? shown.map((g) => giftRow(p, g)).join("")
+          : `<li class="empty">${f === "all" ? "No gifts yet. Add one below, move a wish over, or ask for suggestions." : "No gifts for this occasion yet."}</li>`}</ul>
+        <p class="note" style="margin:0">Click the status to move it along: idea, bought, given.</p>
+        <form class="row" data-form="gift" id="giftForm">
+          <input type="hidden" name="occasion" value="${focusOcc}">
+          <input id="giftTitle" name="title" placeholder="${focusOcc ? `Gift for ${esc(occasionLabel(focusOcc))}` : "Gift"}" aria-label="Gift" required>
+          <input id="giftStore" name="store" placeholder="Where to buy" aria-label="Store">
+          <input id="giftPrice" name="price" type="number" min="0" class="short" placeholder="Price" aria-label="Price">
+          <button type="submit">Add gift</button>
+        </form>
+      </section>`;
+
+    const sugs = ui.sug[p.id] || [];
+    const country = p.country || S.settings.country;
+    const suggest = `
+      <section class="panel suggest">
+        <div class="sec-head"><h3>Suggest gifts${focusOcc ? ` for ${esc(occasionLabel(focusOcc))}` : ""}</h3><span class="note">Based on their wishlist, notes and budget, from shops in ${esc(country)}</span></div>
+        ${sampleFn ? `
+        <form class="row" data-form="suggest" id="suggestForm">
+          <input id="sugPrompt" name="prompt" value="${esc(ui.prompt[p.id] || "")}" placeholder="Optional: under 500 kr, something for the cabin, an experience…" aria-label="What should the suggestions focus on">
+          <button class="primary" type="submit" ${ui.busy ? "disabled" : ""}>${sugs.length ? "Suggest more" : "Suggest gifts"}</button>
+        </form>
+        ${ui.busy === p.id ? `<div class="thinking">Looking through what ${esc(p.name)} likes</div>` : ""}
+        ${ui.sugErr[p.id] ? `<div class="err">${esc(ui.sugErr[p.id])}</div>` : ""}
+        ${sugs.length ? `<div class="sug-grid">${sugs.map((s, i) => `
+          <div class="sug">
+            <div class="title" style="font-weight:600">${esc(s.title)}</div>
+            <div class="why">${esc(s.why)}</div>
+            <div class="stores"><span class="label">Find it at</span><br>${esc((s.stores || []).join(", "))}</div>
+            <div class="foot"><span class="tag">≈ ${esc(money(s.price))}${s.localPrice && !String(s.localPrice).includes(S.settings.currency) ? ` · ${esc(s.localPrice)}` : ""}</span>
+            ${s.added ? `<span class="note">Added</span>` : `<button data-act="add-sug" data-i="${i}">Add to gifts</button>`}</div>
+          </div>`).join("")}</div>
+          <p class="note" style="margin:0">Prices and stock are estimates. Check the store before buying.</p>` : ""}
+        ` : `<p class="note" style="margin:0">Suggestions need Claude, which is available when this page is opened on claude.ai while signed in.</p>`}
+      </section>`;
+
+    main.innerHTML = head + (ui.editing ? "" : wish + gifts + suggest);
+  }
+
+  // ---------- actions ----------
+  function person() { return S.people.find((x) => x.id === sel); }
+  function newPerson(extra) {
+    return Object.assign({ id: uid(), name: "New person", relation: "", country: "", birthday: "", budget: 0, likes: "", wishlist: [], gifts: [] }, extra);
+  }
+  function examples() {
+    const xmas = S.occasions.find((o) => /christmas/i.test(o.name));
+    const a = newPerson({ example: true, name: "Ingrid", relation: "Sister", country: "Norway", birthday: "1994-02-11", budget: 1200,
+      likes: "Ceramics, long hikes, oat lattes. Has too many mugs already. Size S in tops.",
+      wishlist: [{ id: uid(), text: "Merino wool base layer", price: 899 }, { id: uid(), text: "A pottery course", price: 0 }],
+      gifts: [{ id: uid(), title: "Hiking socks, 3-pack", store: "XXL", price: 299, status: "bought", occasion: xmas ? xmas.id : "" }] });
+    const b = newPerson({ example: true, name: "Lars", relation: "Colleague", country: "Sweden", birthday: "1988-11-20", budget: 400,
+      likes: "Board games, hot sauce, cycles to work all year.",
+      wishlist: [], gifts: [{ id: uid(), title: "Cycling gloves", store: "", price: 250, status: "idea", occasion: "birthday" }] });
+    S.people.push(a, b);
+    sel = a.id;
+  }
+
+  function focusOccOf(p) { const f = ui.filter[p.id] || "all"; return f !== "all" && f !== "none" ? f : ""; }
+
+  async function suggestFor(p) {
+    const country = p.country || S.settings.country;
+    const occ = focusOccOf(p);
+    const t = totals(p);
+    const remaining = t.budget ? t.budget - t.spent - t.planned : null;
+    const nb = nextBirthday(p.birthday);
+    const ev = upcoming().slice(0, 3).map((e) => `${e.name} on ${e.date.toDateString()}`).join("; ");
+    const prompt = `You help someone choose gifts. Suggest 6 gift ideas for this person.
+
+Recipient: ${p.name}${p.relation ? ` (${p.relation} of the giver)` : ""}
+Lives in: ${country}
+What they like / notes: ${p.likes || "(nothing noted)"}
+Their wishlist: ${p.wishlist.map((w) => w.text).join("; ") || "(empty)"}
+Gifts already planned or given (do not repeat these): ${p.gifts.map((g) => g.title).join("; ") || "(none)"}
+${t.budget ? `Total budget: ${t.budget} ${S.settings.currency}. Remaining after planned gifts: ${remaining} ${S.settings.currency}.` : "No budget set."}
+${nb ? `Next birthday: ${nb.toDateString()}.` : ""} Upcoming occasions: ${ev || "none"}.
+${occ ? `These suggestions are specifically for: ${occasionLabel(occ)}${occ === "birthday" ? "" : ` (${parseDate(S.occasions.find((o) => o.id === occ).date).toDateString()})`}. Make them fit that occasion.` : ""}
+Today is ${new Date().toDateString()}.
+Giver's request: ${ui.prompt[p.id] || "(none)"}
+
+Rules:
+- Every item must be easy to buy at common, widely available stores or major online shops that operate in ${country}. Name 1 to 3 real stores or chains that exist in ${country} and plausibly stock it.
+- Use the wishlist and their likes as the main signal: items that are on the wishlist, closely related to it, or that fit their interests. Avoid things the notes say they already have.
+- Stay within the remaining budget when there is one, unless the giver's request says otherwise.
+- Prices are typical retail prices.
+
+Reply with only a JSON array of 6 objects, each:
+{"title": "short product name", "why": "one sentence on why it suits them", "stores": ["Store A", "Store B"], "localPrice": "price in ${country}'s currency, e.g. '349 SEK'", "price": number (approximate price converted to ${S.settings.currency})}`;
+    ui.busy = p.id; ui.sugErr[p.id] = ""; render();
+    try {
+      const res = await sampleFn.json(prompt, { cache: false });
+      const items = (Array.isArray(res) ? res : []).filter((s) => s && s.title).map((s) => ({
+        title: String(s.title), why: String(s.why || ""), stores: Array.isArray(s.stores) ? s.stores.map(String) : [],
+        localPrice: s.localPrice ? String(s.localPrice) : "", price: Number(s.price) || 0 }));
+      if (!items.length) throw { message: "Claude didn't return any suggestions. Try rewording your request." };
+      ui.sug[p.id] = items;
+    } catch (e) {
+      ui.sugErr[p.id] = e && e.code === "not_granted" ? "Suggestions weren't allowed for this page. You can allow them from the page's permissions."
+        : e && e.code === "rate_limited" ? "Too many requests right now. Wait a minute and try again."
+        : (e && e.message) || "Couldn't get suggestions. Try again.";
+    } finally { ui.busy = null; render(); }
+  }
+
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-act]");
+    if (!b || !S) return;
+    const act = b.dataset.act, id = b.dataset.id;
+    const p = b.dataset.pid ? S.people.find((x) => x.id === b.dataset.pid) : person();
+    switch (act) {
+      case "select": sel = id; selOcc = null; ui.editing = false; render(); break;
+      case "open-occ": selOcc = id; ui.editing = false; render(); break;
+      case "filter": ui.filter[p.id] = b.dataset.v; render(); break;
+      case "add-person": { const np = newPerson(); S.people.push(np); sel = np.id; selOcc = null; ui.editing = true; commit(); setTimeout(() => { const f = $("#pfName"); f && (f.focus(), f.select()); }); break; }
+      case "examples": examples(); selOcc = null; commit(); break;
+      case "edit": ui.editing = true; render(); break;
+      case "cancel-edit": ui.editing = false; render(); break;
+      case "del-person":
+        if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = `Click again to remove ${p.name}`; return; }
+        S.people = S.people.filter((x) => x.id !== p.id); sel = S.people[0]?.id || null; ui.editing = false; commit(); break;
+      case "del-occ":
+        S.occasions = S.occasions.filter((o) => o.id !== id);
+        for (const x of S.people) for (const g of x.gifts) if (g.occasion === id) g.occasion = "";
+        for (const k in ui.filter) if (ui.filter[k] === id) ui.filter[k] = "all";
+        if (selOcc === id) selOcc = null;
+        commit(); break;
+      case "del-wish": p.wishlist = p.wishlist.filter((w) => w.id !== id); commit(); break;
+      case "plan-wish": { const w = p.wishlist.find((w) => w.id === id); p.gifts.push({ id: uid(), title: w.text, store: "", price: w.price || 0, status: "idea", occasion: focusOccOf(p) }); p.wishlist = p.wishlist.filter((x) => x.id !== id); commit(); break; }
+      case "del-gift": p.gifts = p.gifts.filter((g) => g.id !== id); commit(); break;
+      case "cycle": { const g = p.gifts.find((g) => g.id === id); g.status = { idea: "bought", bought: "given", given: "idea" }[g.status]; commit(); break; }
+      case "add-sug": { const s = ui.sug[p.id][Number(b.dataset.i)]; p.gifts.push({ id: uid(), title: s.title, store: s.stores.join(", "), price: Math.round(s.price), status: "idea", occasion: focusOccOf(p) }); s.added = true; commit(); break; }
+    }
+  });
+
+  document.addEventListener("submit", (ev) => {
+    const f = ev.target.closest("[data-form]");
+    if (!f || !S) return;
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(f));
+    const p = person();
+    switch (f.dataset.form) {
+      case "occasion": S.occasions.push({ id: uid(), name: d.name.trim(), date: d.date }); f.reset(); commit(); break;
+      case "person": Object.assign(p, { name: d.name.trim() || "Unnamed", relation: d.relation.trim(), country: d.country.trim(), birthday: d.birthday, budget: Number(d.budget) || 0 }); ui.editing = false; commit(); break;
+      case "wish": p.wishlist.push({ id: uid(), text: d.text.trim(), price: Number(d.price) || 0 }); commit(); $("#wishText")?.focus(); break;
+      case "gift": {
+        const target = d.pid ? S.people.find((x) => x.id === d.pid) : p;
+        target.gifts.push({ id: uid(), title: d.title.trim(), store: (d.store || "").trim(), price: Number(d.price) || 0, status: "idea", occasion: d.occasion || "" });
+        const formId = f.id; commit();
+        document.getElementById(formId)?.querySelector('input[name="title"]')?.focus();
+        break;
+      }
+      case "suggest": ui.prompt[p.id] = d.prompt.trim(); if (sampleFn && !ui.busy) suggestFor(p); break;
+    }
+  });
+
+  document.addEventListener("change", (ev) => {
+    const el = ev.target;
+    if (!S) return;
+    const p = person();
+    if (el.dataset.field === "likes") { p.likes = el.value; save(); }
+    else if (el.dataset.giftOcc) { S.people.find((x) => x.id === el.dataset.pid).gifts.find((g) => g.id === el.dataset.giftOcc).occasion = el.value; commit(); }
+    else if (el.dataset.setting) {
+      let v = el.value.trim();
+      if (el.dataset.setting === "currency") v = v.toUpperCase() || "NOK";
+      S.settings[el.dataset.setting] = v || S.settings[el.dataset.setting]; commit();
+    }
+  });
+  document.addEventListener("input", (ev) => { if (ev.target.id === "sugPrompt" && sel) ui.prompt[sel] = ev.target.value; });
+
+  boot();
+})();
+</script>
