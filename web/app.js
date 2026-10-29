@@ -248,18 +248,20 @@ function renderSettings() {
 }
 
 // Title (linked to the product page when there is one), optional thumbnail and sub-line.
-function itemHead(title, sub, item) {
+function itemHead(title, sub, item, extraHtml = "") {
   const url = safeUrl(item.url), img = safeUrl(item.image_url);
   return `<div class="item-head">
     ${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
-    <div><div class="title">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>` : esc(title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ""}</div>
+    <div><div class="title">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>` : esc(title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ""}${extraHtml}</div>
   </div>`;
 }
 
 function giftRow(p, g) {
   const byOther = g.status !== "idea" && g.bought_by && g.bought_by !== me.id;
   const sub = [g.store, byOther ? `bought by ${nameOf(g.bought_by)}` : ""].filter(Boolean).join(" · ");
-  return `<li>${itemHead(g.title, sub, g)}
+  // On phones the occasion dropdown is hidden, so the occasion shows as text instead.
+  const occ = occasionLabel(occKey(g));
+  return `<li>${itemHead(g.title, sub, g, occ ? `<div class="sub occ-text">${esc(occ)}</div>` : "")}
     <div class="ctrls">
       <select id="occ-${g.id}" data-gift-occ="${g.id}" aria-label="Occasion for ${esc(g.title)}">${occOpts(occKey(g))}</select>
       ${Number(g.price) ? `<span class="tag">${esc(money(g.price))}</span>` : ""}
