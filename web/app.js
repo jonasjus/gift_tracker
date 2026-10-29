@@ -13,7 +13,7 @@ let sel = null;        // selected person id
 let selOcc = null;     // selected occasion id (occasion list view)
 let channel = null;
 let reloadTimer = null, reloadPending = false;
-const ui = { editing: false, sug: {}, prompt: {}, busy: null, sugErr: {}, filter: {}, authMode: "signin" };
+const ui = { editing: false, sug: {}, prompt: {}, busy: null, sugErr: {}, filter: {}, link: {}, authMode: "signin" };
 const STATUS = { idea: "Idea", bought: "Bought", given: "Given ✓" };
 
 // ---------- small helpers ----------
@@ -44,6 +44,8 @@ const occFields = (key) => ({ occasion_id: key && key !== "birthday" ? key : nul
 const hiddenFromMe = (p) => p.member_id === me.id;
 const person = () => D.people.find((x) => x.id === sel);
 const sumPrice = (gs) => gs.reduce((a, g) => a + (Number(g.price) || 0), 0);
+const safeUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : "");
+const isUrl = (s) => /^https?:\/\/\S+$/i.test((s || "").trim());
 function replaceLocal(list, row) { const i = list.findIndex((x) => x.id === row.id); if (i >= 0) list[i] = row; else list.push(row); }
 
 // ---------- dates & money ----------
@@ -244,10 +246,19 @@ function renderSettings() {
   }
 }
 
+// Title (linked to the product page when there is one), optional thumbnail and sub-line.
+function itemHead(title, sub, item) {
+  const url = safeUrl(item.url), img = safeUrl(item.image_url);
+  return `<div class="item-head">
+    ${img ? `<img class="thumb" src="${esc(img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+    <div><div class="title">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>` : esc(title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ""}</div>
+  </div>`;
+}
+
 function giftRow(p, g) {
   const byOther = g.status !== "idea" && g.bought_by && g.bought_by !== me.id;
   const sub = [g.store, byOther ? `bought by ${nameOf(g.bought_by)}` : ""].filter(Boolean).join(" · ");
-  return `<li><div><div class="title">${esc(g.title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ""}</div>
+  return `<li>${itemHead(g.title, sub, g)}
     <div class="ctrls">
       <select id="occ-${g.id}" data-gift-occ="${g.id}" aria-label="Occasion for ${esc(g.title)}">${occOpts(occKey(g))}</select>
       ${Number(g.price) ? `<span class="tag">${esc(money(g.price))}</span>` : ""}
@@ -386,7 +397,7 @@ function renderMain() {
     <section class="panel">
       <div class="sec-head"><h3>${hidden ? "Your wishlist" : "Their wishlist"}</h3><span class="note">${hidden ? "Everyone in the group can see this" : `What ${esc(p.name)} has asked for`}</span></div>
       <ul class="items">${wishes.length ? wishes.map((w) => `
-        <li><div><div class="title">${esc(w.text)}</div></div>
+        <li>${itemHead(w.text, "", w)}
         <div class="ctrls">${Number(w.price) ? `<span class="tag">${esc(money(w.price))}</span>` : ""}
           ${hidden ? "" : `<button data-act="plan-wish" data-id="${w.id}">Add to gifts</button>`}
           <button class="ghost" data-act="del-wish" data-id="${w.id}" aria-label="Remove ${esc(w.text)}">✕</button></div></li>`).join("")
@@ -399,7 +410,7 @@ function renderMain() {
     </section>`;
 
   if (hidden) {
-    main.innerHTML = head + wish + `<section class="panel"><h3>Gifts</h3><p class="hidden-note">${esc(nameOf(p.owner_id))} linked this person to your account, so the gifts planned for you are hidden from you.</p></section>`;
+    main.innerHTML = head + (ui.editing ? "" : linkBox(p, true) + wish) + `<section class="panel"><h3>Gifts</h3><p class="hidden-note">${esc(nameOf(p.owner_id))} linked this person to your account, so the gifts planned for you are hidden from you.</p></section>`;
     return;
   }
 
@@ -441,7 +452,42 @@ function renderMain() {
         <p class="note" style="margin:0">Prices and stock are estimates. Check the store before buying.</p>` : ""}
     </section>`;
 
-  main.innerHTML = head + (ui.editing ? "" : wish + giftsSec + suggest);
+  main.innerHTML = head + (ui.editing ? "" : linkBox(p, false) + wish + giftsSec + suggest);
+}
+
+function linkBox(p, hidden) {
+  const L = ui.link[p.id] || {};
+  const it = L.item;
+  const focusOcc = focusOccOf(p);
+  const otherCurrency = it && it.price != null && it.currency && it.currency !== currency();
+  return `
+    <section class="panel">
+      <div class="sec-head"><h3>Add from a link</h3><span class="note">Paste a product page from any web shop</span></div>
+      <form class="row" data-form="link" id="linkForm">
+        <input id="linkUrl" name="url" type="url" inputmode="url" value="${esc(L.url || "")}" placeholder="https://www.elkjop.no/product/…" aria-label="Product link" required>
+        <button type="submit" ${L.loading ? "disabled" : ""}>${L.loading ? "Reading page…" : "Get details"}</button>
+      </form>
+      ${L.error ? `<div class="err">${esc(L.error)}</div>` : ""}
+      ${it ? `
+      <form class="link-preview" data-form="link-save" id="linkSave">
+        ${safeUrl(it.image) ? `<img class="preview-img" src="${esc(it.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+        <div class="link-fields">
+          <div class="field"><label for="lkTitle">Name</label><input id="lkTitle" name="title" value="${esc(it.title)}" required></div>
+          <div class="row">
+            <div class="field" style="flex:1 1 140px"><label for="lkStore">Store</label><input id="lkStore" name="store" value="${esc(it.store)}"></div>
+            <div class="field" style="flex:0 1 130px"><label for="lkPrice">Price (${esc(currency())})</label>
+              <input id="lkPrice" name="price" type="number" min="0" step="any" value="${otherCurrency || it.price == null ? "" : esc(it.price)}"></div>
+          </div>
+          ${otherCurrency ? `<p class="note" style="margin:0">Listed at ${esc(it.price)} ${esc(it.currency)}. Enter the price in ${esc(currency())}.</p>` : ""}
+          ${it.price == null ? `<p class="note" style="margin:0">No price on the page. Add it yourself if you know it.</p>` : ""}
+          <div class="row">
+            ${hidden ? "" : `<button class="primary" type="submit" name="to" value="gift">Add to gifts${focusOcc ? ` for ${esc(occasionLabel(focusOcc))}` : ""}</button>`}
+            <button type="submit" name="to" value="wish"${hidden ? ' class="primary"' : ""}>Add to wishlist</button>
+            <button type="button" class="ghost" data-act="link-cancel">Cancel</button>
+          </div>
+        </div>
+      </form>` : ""}
+    </section>`;
 }
 
 // ---------- actions ----------
@@ -451,6 +497,23 @@ async function addGift(fields) {
   const row = await run(sb.from("gifts").insert(fields).select().single());
   D.gifts.push(row);
   render();
+}
+
+async function fetchLink(p, url) {
+  ui.link[p.id] = { url, loading: true };
+  render();
+  try {
+    const { data, error } = await sb.functions.invoke("fetch-product", { body: { url } });
+    if (error) {
+      let msg = "Couldn't read that link. Add the item by hand instead.";
+      try { const b = await error.context.json(); if (b?.error) msg = b.error; } catch {}
+      throw new Error(msg);
+    }
+    ui.link[p.id] = { url, item: data };
+  } catch (e) {
+    ui.link[p.id] = { url, error: e.message };
+  }
+  if (sel === p.id && !selOcc) { render(); $("#lkTitle")?.focus(); }
 }
 
 async function suggestFor(p) {
@@ -516,7 +579,7 @@ document.addEventListener("click", async (ev) => {
         break;
       case "plan-wish": {
         const w = D.wishes.find((x) => x.id === id);
-        await addGift({ person_id: p.id, title: w.text, price: Number(w.price) || 0, ...occFields(focusOccOf(p)) });
+        await addGift({ person_id: p.id, title: w.text, price: Number(w.price) || 0, url: w.url, image_url: w.image_url, ...occFields(focusOccOf(p)) });
         await run(sb.from("wishlist_items").delete().eq("id", id));
         D.wishes = D.wishes.filter((x) => x.id !== id); render();
         break;
@@ -539,6 +602,7 @@ document.addEventListener("click", async (ev) => {
         await addGift({ person_id: p.id, title: s.title, store: s.stores.join(", "), price: Math.round(s.price), ...occFields(focusOccOf(p)) });
         break;
       }
+      case "link-cancel": delete ui.link[p.id]; render(); break;
       case "copy-code":
         try { await navigator.clipboard.writeText(b.dataset.code); toast(`Copied invite code ${b.dataset.code}`); }
         catch { toast(`Invite code: ${b.dataset.code}`); }
@@ -609,12 +673,35 @@ document.addEventListener("submit", async (ev) => {
         if (p.group_id !== patch.group_id && patch.group_id !== undefined) await loadAll(); else render();
         break;
       }
+      case "link": {
+        const url = d.url.trim();
+        if (!isUrl(url)) { ui.link[p.id] = { url, error: "Paste the full link, starting with https://" }; render(); break; }
+        fetchLink(p, url);
+        break;
+      }
+      case "link-save": {
+        const it = ui.link[p.id]?.item;
+        if (!it) break;
+        const to = ev.submitter?.value || (hiddenFromMe(p) ? "wish" : "gift");
+        const base = { person_id: p.id, price: Number(d.price) || 0, url: safeUrl(it.url) || null, image_url: safeUrl(it.image) || null };
+        if (to === "wish") {
+          D.wishes.push(await run(sb.from("wishlist_items").insert({ ...base, text: d.title.trim() }).select().single()));
+        } else {
+          D.gifts.push(await run(sb.from("gifts").insert({ ...base, title: d.title.trim(), store: d.store.trim(), ...occFields(focusOccOf(p)) }).select().single()));
+        }
+        delete ui.link[p.id];
+        render();
+        toast(to === "wish" ? `Added to ${hiddenFromMe(p) ? "your" : `${p.name}'s`} wishlist` : `Added to gifts for ${p.name}`);
+        break;
+      }
       case "wish": {
+        if (isUrl(d.text)) { f.reset(); fetchLink(p, d.text.trim()); break; }
         const row = await run(sb.from("wishlist_items").insert({ person_id: p.id, text: d.text.trim(), price: Number(d.price) || 0 }).select().single());
         D.wishes.push(row); render(); $("#wishText")?.focus();
         break;
       }
       case "gift": {
+        if (!d.pid && isUrl(d.title)) { f.reset(); fetchLink(p, d.title.trim()); break; }
         const formId = f.id;
         await addGift({ person_id: d.pid || p.id, title: d.title.trim(), store: (d.store || "").trim(), price: Number(d.price) || 0, ...occFields(d.occasion || "") });
         document.getElementById(formId)?.querySelector('input[name="title"]')?.focus();
@@ -652,7 +739,11 @@ document.addEventListener("change", async (ev) => {
     }
   } catch { /* run() already showed the error */ }
 });
-document.addEventListener("input", (ev) => { if (ev.target.id === "sugPrompt" && sel) ui.prompt[sel] = ev.target.value; });
+document.addEventListener("input", (ev) => {
+  if (!sel) return;
+  if (ev.target.id === "sugPrompt") ui.prompt[sel] = ev.target.value;
+  if (ev.target.id === "linkUrl") ui.link[sel] = { ...ui.link[sel], url: ev.target.value };
+});
 
 // ---------- boot ----------
 if (!sb) {

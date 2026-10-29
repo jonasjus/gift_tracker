@@ -248,3 +248,14 @@ main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px;
   font-size: 14px; max-width: min(520px, calc(100% - 32px)); box-shadow: 0 6px 24px rgb(0 0 0 / .18); z-index: 20;
 }
+
+/* Product links */
+.item-head { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.thumb { width: 40px; height: 40px; flex: none; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
+.items .title a { color: inherit; text-decoration: underline; text-decoration-color: var(--muted); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.items .title a:hover { color: var(--ribbon); text-decoration-color: currentColor; }
+.link-preview { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--paper); }
+.preview-img { width: 120px; height: 120px; flex: none; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--line); }
+.link-fields { flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.link-fields input { width: 100%; background: var(--surface); }
+#linkForm input { flex: 1 1 220px; }

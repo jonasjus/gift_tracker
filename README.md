@@ -11,8 +11,11 @@ gift_tracker/
 │   └── config.js                your Supabase URL and anon key go here
 ├── supabase/
 │   ├── config.toml
-│   ├── migrations/…_init.sql    tables, row-level security, group functions
-│   └── functions/suggest-gifts/ Edge Function that calls the Gemini API
+│   ├── migrations/              tables, row-level security, group functions
+│   └── functions/
+│       ├── suggest-gifts/       gift ideas from the Gemini API
+│       ├── fetch-product/       reads a product page from a pasted link
+│       └── _shared/             CORS and auth helpers
 └── gift_tracker.html            the original single-user claude.ai version
 ```
 
@@ -46,6 +49,7 @@ gift_tracker/
    ```sh
    supabase secrets set GEMINI_API_KEY=...
    supabase functions deploy suggest-gifts
+   supabase functions deploy fetch-product
    ```
 
 5. **Point the site at your project.** In the dashboard, open Project Settings → API. Copy the project URL and the `anon` public key into `web/config.js`. The anon key is meant to be public, because row-level security protects the data.
@@ -76,6 +80,19 @@ gift_tracker/
 The database and the `suggest-gifts` function still deploy through the Supabase CLI (setup steps 3 and 4), not through Vercel.
 
 To run locally, either fill in `web/config.js` by hand, or run `SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/write-config.mjs`. Then start `python3 -m http.server 5173 -d web`.
+
+## Adding items from a link
+
+On a person's page, paste a product link into **Add from a link** (or straight into the wish or gift field) and click **Get details**. The `fetch-product` function reads the page:
+
+1. It reads the store's structured product data (JSON-LD, Open Graph and product meta tags) for the name, price, currency, image and store. Most large web shops publish this.
+2. If the name or price is still missing, it sends the page text to Gemini to find them.
+
+You get a preview to check and edit, then add it to the gifts or the wishlist. Saved items link to the product page and show its image.
+
+- If the shop's price is in another currency, the price field is left empty and the preview shows the listed price, so you can enter it in your own currency.
+- Some shops block automated requests. The app then asks you to add the item by hand.
+- The function only fetches public http(s) addresses. Links to localhost or private networks are refused.
 
 ## Gift suggestions
 

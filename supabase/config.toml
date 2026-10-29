@@ -2,3 +2,6 @@ project_id = "gift-tracker"
 
 [functions.suggest-gifts]
 verify_jwt = true
+
+[functions.fetch-product]
+verify_jwt = true

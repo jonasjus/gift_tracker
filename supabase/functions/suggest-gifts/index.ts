@@ -3,13 +3,7 @@
 // security decides what this function can see. Needs the GEMINI_API_KEY secret;
 // GEMINI_MODEL optionally overrides the model.
 import { ApiError, FinishReason, GoogleGenAI } from "npm:@google/genai@2.29.1";
-import { createClient } from "npm:@supabase/supabase-js@2.117.3";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { clientFor, CORS, json } from "../_shared/http.ts";
 
 const SUGGESTIONS_SCHEMA = {
   type: "object",
@@ -38,10 +32,6 @@ const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-flash-latest";
 const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Use POST." }, 405);
@@ -58,9 +48,7 @@ Deno.serve(async (req) => {
     return json({ error: "The suggestion service isn't set up yet." }, 500);
   }
 
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-  });
+  const supabase = clientFor(req);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "Sign in to get suggestions." }, 401);
 
