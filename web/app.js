@@ -13,7 +13,7 @@ let sel = null;        // selected person id
 let selOcc = null;     // selected occasion id (occasion list view)
 let channel = null;
 let reloadTimer = null, reloadPending = false;
-const ui = { editing: false, sug: {}, prompt: {}, busy: null, sugErr: {}, filter: {}, modal: null, authMode: "signin" };
+const ui = { editing: false, sug: {}, prompt: {}, busy: null, sugErr: {}, filter: {}, modal: null, family: null, authMode: "signin" };
 const STATUS = { idea: "Idea", bought: "Bought", given: "Given ✓" };
 
 // ---------- small helpers ----------
@@ -173,6 +173,7 @@ function onSession(session) {
   me = u;
   if (channel) { sb.removeChannel(channel); channel = null; }
   if (ui.modal) closeModal();
+  if (ui.family) closeFamily();
   D = null; sel = null; selOcc = null; ui.sug = {}; ui.filter = {}; ui.editing = false;
   showView(!!me);
   if (me) {
@@ -188,6 +189,7 @@ function render() {
   if (!D) return;
   $("#userName").textContent = D.profile.display_name || me.email;
   renderSummary(); renderPeople(); renderOccasions(); renderGroups(); renderSettings(); renderMain();
+  if (ui.family) renderFamily();
 }
 
 function renderSummary() {
@@ -230,11 +232,12 @@ function renderOccasions() {
 function renderGroups() {
   $("#groupList").innerHTML = D.groups.length ? D.groups.map((g) => `
     <li class="grp">
-      <div class="grp-top"><b>${esc(g.name)}</b>
+      <div class="grp-top"><button class="grp-name" data-act="open-family" data-id="${g.id}">${esc(g.name)}</button>
         ${g.created_by === me.id
           ? `<button class="ghost danger" data-act="del-group" data-id="${g.id}">Delete</button>`
           : `<button class="ghost" data-act="leave-group" data-id="${g.id}">Leave</button>`}</div>
       <div class="sub">${esc(groupMembers(g.id).map(nameOf).join(", "))}</div>
+      <div><button class="ghost" data-act="open-family" data-id="${g.id}" style="padding-left:0;text-align:left">See members</button></div>
       <div class="row"><span class="label">Invite code</span><code>${esc(g.invite_code)}</code>
         <button class="ghost" data-act="copy-code" data-code="${esc(g.invite_code)}">Copy</button></div>
     </li>`).join("")
@@ -256,18 +259,31 @@ function itemHead(title, sub, item, extraHtml = "") {
   </div>`;
 }
 
+// In a shared list, a gift picked by one member is locked for everyone else:
+// only they can change its status, release it or remove it.
 function giftRow(p, g) {
-  const byOther = g.status !== "idea" && g.bought_by && g.bought_by !== me.id;
+  const shared = !!p.group_id;
+  const mine = g.claimed_by === me.id;
+  const locked = !!g.claimed_by && !mine;
+  const byOther = !shared && g.status !== "idea" && g.bought_by && g.bought_by !== me.id;
   const sub = [g.store, byOther ? `bought by ${nameOf(g.bought_by)}` : ""].filter(Boolean).join(" · ");
   // On phones the occasion dropdown is hidden, so the occasion shows as text instead.
   const occ = occasionLabel(occKey(g));
-  return `<li>${itemHead(g.title, sub, g, occ ? `<div class="sub occ-text">${esc(occ)}</div>` : "")}
+  const claimLine = shared && g.claimed_by
+    ? `<div class="claim-line${mine ? " mine" : ""}">${mine ? "You're giving this" : `${esc(nameOf(g.claimed_by))} is giving this`}</div>`
+    : "";
+  const claimBtn = !shared ? ""
+    : !g.claimed_by ? `<button class="claim" data-act="claim" data-id="${g.id}">I'll give this</button>`
+    : mine && g.status === "idea" ? `<button class="ghost" data-act="unclaim" data-id="${g.id}">Undo</button>`
+    : "";
+  return `<li class="${locked ? "locked" : ""}">${itemHead(g.title, sub, g, (occ ? `<div class="sub occ-text">${esc(occ)}</div>` : "") + claimLine)}
     <div class="ctrls">
+      ${claimBtn}
       <select id="occ-${g.id}" data-gift-occ="${g.id}" aria-label="Occasion for ${esc(g.title)}">${occOpts(occKey(g))}</select>
       ${Number(g.price) ? `<span class="tag">${esc(money(g.price))}</span>` : ""}
-      <button class="status ${g.status}" data-act="cycle" data-id="${g.id}">${STATUS[g.status]}</button>
+      <button class="status ${g.status}" data-act="cycle" data-id="${g.id}" ${locked ? `disabled title="${esc(nameOf(g.claimed_by))} is giving this"` : ""}>${STATUS[g.status]}</button>
       <button class="ghost" data-act="edit-gift" data-id="${g.id}" aria-label="Edit ${esc(g.title)}">Edit</button>
-      <button class="ghost" data-act="del-gift" data-id="${g.id}" aria-label="Remove ${esc(g.title)}">✕</button>
+      ${locked ? "" : `<button class="ghost" data-act="del-gift" data-id="${g.id}" aria-label="Remove ${esc(g.title)}">✕</button>`}
     </div></li>`;
 }
 
@@ -373,7 +389,7 @@ function renderMain() {
             ${p.relation ? `<span>${esc(p.relation)}</span>` : ""}
             <span>Lives in ${esc(p.country || D.profile.country)}</span>
             ${nb ? `<span>Birthday ${fmtDate(nb)}, ${inDays(daysUntil(nb))}</span>` : ""}
-            ${p.group_id ? `<span>Shared with ${esc(groupName(p.group_id))}${mine ? "" : `, added by ${esc(nameOf(p.owner_id))}`}</span>` : ""}
+            ${p.group_id ? `<span>Shared with <button class="inline-link" data-act="open-family" data-id="${p.group_id}">${esc(groupName(p.group_id))}</button>${mine ? "" : `, added by ${esc(nameOf(p.owner_id))}`}</span>` : ""}
           </div>
           <div><button class="ghost" data-act="edit" style="padding-left:0">Edit details</button></div>
         </div>
@@ -446,6 +462,83 @@ function renderMain() {
     </section>`;
 
   main.innerHTML = head + (ui.editing ? "" : wish + giftsSec + suggest);
+}
+
+// ---------- family pane ----------
+// Members of one group, what each has picked to give, and who the group buys for.
+// Gifts hidden from the viewer by row-level security never reach D, so nothing here spoils a surprise.
+function renderFamily() {
+  const dlg = $("#familyDialog");
+  const g = D?.groups.find((x) => x.id === ui.family);
+  if (!g) { closeFamily(); return; }
+  const isCreator = g.created_by === me.id;
+  const people = D.people.filter((p) => p.group_id === g.id);
+  const personName = (pid) => D.people.find((p) => p.id === pid)?.name || "someone";
+  const groupGifts = D.gifts.filter((x) => people.some((p) => p.id === x.person_id));
+  const displayName = (uid) => (uid === me.id ? D.profile.display_name || "You" : D.profiles[uid]?.display_name || "Member");
+  const members = groupMembers(g.id).sort((a, b) =>
+    (b === g.created_by) - (a === g.created_by) || displayName(a).localeCompare(displayName(b)));
+
+  const memberRows = members.map((uid) => {
+    const name = displayName(uid);
+    const tags = [uid === me.id ? "You" : "", uid === g.created_by ? "Created the group" : ""].filter(Boolean);
+    const giving = groupGifts.filter((x) => x.claimed_by === uid);
+    const linked = people.filter((p) => p.member_id === uid);
+    return `<li class="member">
+      <span class="avatar" aria-hidden="true">${esc((name.trim()[0] || "?").toUpperCase())}</span>
+      <div class="member-main">
+        <div class="member-name"><b>${esc(name)}</b>${tags.map((t) => `<span class="badge">${esc(t)}</span>`).join("")}</div>
+        <div class="sub">${giving.length
+          ? `Giving ${giving.map((x) => `${esc(x.title)} to ${esc(personName(x.person_id))}`).join(", ")}`
+          : "Hasn't picked a gift yet"}</div>
+        ${linked.map((p) => `<div class="sub">${uid === me.id ? `You're ${esc(p.name)} on the list, so gifts for you are hidden` : `Is ${esc(p.name)} on the list, so those gifts are hidden from them`}</div>`).join("")}
+      </div>
+      ${isCreator && uid !== me.id ? `<button class="ghost danger" data-act="remove-member" data-uid="${uid}">Remove</button>` : ""}
+    </li>`;
+  }).join("");
+
+  const buyingRows = people.map((p) => {
+    const gs = giftsOf(p.id), picked = gs.filter((x) => x.claimed_by).length;
+    const detail = hiddenFromMe(p) ? "Gifts for you are hidden"
+      : gs.length ? `${gs.length} gift${gs.length === 1 ? "" : "s"} · ${picked} picked` : "No gifts yet";
+    return `<li><button class="person-link" data-act="family-person" data-id="${p.id}">${esc(p.name)}</button><span class="sub">${detail}</span></li>`;
+  }).join("");
+
+  dlg.innerHTML = `<div class="sheet">
+    <div class="sheet-head"><div><span class="label">Group</span><h2 id="familyTitle">${esc(g.name)}</h2></div>
+      <button class="ghost" data-act="family-close" aria-label="Close">✕</button></div>
+    <section class="fam-sec">
+      <h3 class="label">${members.length} ${members.length === 1 ? "member" : "members"}</h3>
+      <ul class="members">${memberRows}</ul>
+    </section>
+    <section class="fam-sec">
+      <h3 class="label">Buying for</h3>
+      ${people.length ? `<ul class="buying">${buyingRows}</ul>`
+        : `<p class="note" style="margin:0">Nobody is shared with ${esc(g.name)} yet. Open a person, choose Edit details and set Shared with to ${esc(g.name)}.</p>`}
+      <p class="note" style="margin:0">Pick a gift with "I'll give this" so nobody else buys it too.</p>
+    </section>
+    <div class="row invite"><span class="label">Invite code</span><code>${esc(g.invite_code)}</code>
+      <button class="ghost" data-act="copy-code" data-code="${esc(g.invite_code)}">Copy</button></div>
+    <div class="row sheet-actions">
+      ${isCreator
+        ? `<button class="ghost danger" data-act="del-group" data-id="${g.id}" style="margin-right:auto">Delete group</button>`
+        : `<button class="ghost danger" data-act="leave-group" data-id="${g.id}" style="margin-right:auto">Leave group</button>`}
+      <button class="primary" data-act="family-close" autofocus>Done</button>
+    </div>
+  </div>`;
+}
+
+function showFamily() {
+  renderFamily();
+  const dlg = $("#familyDialog");
+  if (ui.family && !dlg.open) dlg.showModal();
+}
+
+function closeFamily() {
+  ui.family = null;
+  const dlg = $("#familyDialog");
+  if (dlg.open) dlg.close();
+  dlg.innerHTML = "";
 }
 
 // ---------- gift pane ----------
@@ -711,7 +804,30 @@ document.addEventListener("click", async (ev) => {
         const status = { idea: "bought", bought: "given", given: "idea" }[g.status];
         const patch = { status, bought_by: status === "idea" ? null : g.bought_by || me.id };
         replaceLocal(D.gifts, { ...g, ...patch }); render();
-        replaceLocal(D.gifts, await run(sb.from("gifts").update(patch).eq("id", id).select().single())); render();
+        try {
+          replaceLocal(D.gifts, await run(sb.from("gifts").update(patch).eq("id", id).select().single())); render();
+        } catch { replaceLocal(D.gifts, g); render(); }
+        break;
+      }
+      case "claim": {
+        const row = await run(sb.from("gifts").update({ claimed_by: me.id }).eq("id", id).is("claimed_by", null).select().maybeSingle());
+        if (!row) { toast("Someone else just picked this gift."); await loadAll(); break; }
+        replaceLocal(D.gifts, row); render();
+        toast("It's yours. The others can see you're giving it.");
+        break;
+      }
+      case "unclaim": {
+        replaceLocal(D.gifts, await run(sb.from("gifts").update({ claimed_by: null }).eq("id", id).eq("claimed_by", me.id).select().single()));
+        render();
+        break;
+      }
+      case "open-family": ui.family = id; showFamily(); break;
+      case "family-close": closeFamily(); break;
+      case "family-person": closeFamily(); sel = id; selOcc = null; ui.editing = false; render(); break;
+      case "remove-member": {
+        if (!confirmClick(b, "Click again to remove")) return;
+        await run(sb.from("group_members").delete().eq("group_id", ui.family).eq("user_id", b.dataset.uid));
+        await loadAll();
         break;
       }
       case "add-sug": {
@@ -874,6 +990,9 @@ document.addEventListener("input", (ev) => {
 const addDialog = $("#addDialog");
 addDialog.addEventListener("close", () => { ui.modal = null; addDialog.innerHTML = ""; });
 addDialog.addEventListener("click", (ev) => { if (ev.target === addDialog) closeModal(); });
+const familyDialog = $("#familyDialog");
+familyDialog.addEventListener("close", () => { ui.family = null; familyDialog.innerHTML = ""; });
+familyDialog.addEventListener("click", (ev) => { if (ev.target === familyDialog) closeFamily(); });
 
 // ---------- boot ----------
 if (!sb) {

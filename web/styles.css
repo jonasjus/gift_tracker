@@ -317,3 +317,32 @@ main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .stats { gap: 10px 20px; }
   .todo { gap: 6px; }
 }
+
+/* Picking gifts in shared lists */
+.claim { font-size: 13px; padding: 4px 10px; border-color: var(--ok); color: var(--ok); background: transparent; }
+.claim:hover { background: var(--ok); color: var(--surface); border-color: var(--ok); }
+.claim-line { font-size: 12.5px; font-weight: 600; color: var(--tag); }
+.claim-line.mine { color: var(--ok); }
+.items li.locked .title { color: var(--muted); }
+.status:disabled { opacity: .6; cursor: not-allowed; }
+.inline-link { border: 0; background: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.inline-link:hover { color: var(--ribbon); }
+.grp-name { border: 0; background: none; padding: 0; font-weight: 600; text-align: left; }
+.grp-name:hover { color: var(--ribbon); }
+
+/* Family pane */
+.fam-sec { display: flex; flex-direction: column; gap: 8px; }
+.fam-sec h3.label { font-family: var(--font-body); font-size: 11.5px; }
+.members, .buying { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.member { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.member:first-child { border-top: 0; padding-top: 2px; }
+.avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--ribbon-soft); color: var(--ribbon); font-family: var(--font-display); font-size: 16px; }
+.member-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.member-name { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; }
+.member .sub, .buying .sub { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.buying li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.buying li:first-child { border-top: 0; }
+.person-link { border: 0; background: none; padding: 0; font-weight: 600; text-align: left; }
+.person-link:hover { color: var(--ribbon); text-decoration: underline; text-underline-offset: 3px; }
+.invite { padding-top: 4px; border-top: 1px solid var(--line); }
+.invite code { font-family: var(--font-mono); font-size: 13px; letter-spacing: .08em; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
